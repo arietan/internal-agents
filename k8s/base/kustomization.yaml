@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+commonLabels:
+  app.kubernetes.io/part-of: internal-agents
+  app.kubernetes.io/managed-by: kustomize
+
+resources:
+  # Shared infra
+  - namespace.yaml
+  - rbac.yaml
+  - configmap.yaml
+  # secrets.yaml is a TEMPLATE — use sealed-secrets or external-secrets in production
+  # - secrets.yaml
+
+  # MAS AIRG compliance resources
+  - compliance.yaml
+  - ai-registry.yaml
+
+  # Self-hosted LLM stack (Ollama + LiteLLM gateway)
+  - models/ollama/deployment.yaml
+  - models/litellm/deployment.yaml
+  # Uncomment for vLLM (requires GPU node):
+  # - models/vllm/deployment.yaml
+
+  # Observability stack
+  - observability/namespace.yaml
+  - observability/otel-collector/deployment.yaml
+  - observability/prometheus/deployment.yaml
+  - observability/langfuse/deployment.yaml
+  - observability/loki-tempo.yaml
+  - observability/grafana/deployment.yaml
+  - observability/grafana/dashboards-configmap.yaml
+
+  # Coding agent
+  - ../../agents/coding-agent/agent.yaml
+  - ../../agents/coding-agent/cronjob.yaml
+
+  # PR review agent
+  - ../../agents/pr-review-agent/agent.yaml
+  - ../../agents/pr-review-agent/deployment.yaml

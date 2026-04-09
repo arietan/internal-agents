@@ -1,0 +1,42 @@
+# MAS AIRG Compliance Resources
+# Kill switch, audit storage, and compliance configuration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-compliance-config
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+    compliance.mas.gov.sg/type: controls
+data:
+  # Kill switch — set to "true" to halt all agent operations immediately
+  COMPLIANCE_KILL_SWITCH: "false"
+
+  # DLP controls
+  DLP_ENABLED: "true"
+  DLP_DENY_PATTERNS: ".env,credentials,secrets,private,password,token"
+
+  # Provider allowlist (blocks external API calls by default)
+  APPROVED_PROVIDERS: "litellm,ollama,vllm"
+
+  # Data retention (days)
+  AUDIT_RETENTION_DAYS: "2555"  # ~7 years per MAS record-keeping requirements
+
+  # Agent version for audit provenance
+  AGENT_VERSION: "0.2.0"
+---
+# Persistent volume for immutable audit trail
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: agent-audit-logs
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+    compliance.mas.gov.sg/type: audit-trail
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi

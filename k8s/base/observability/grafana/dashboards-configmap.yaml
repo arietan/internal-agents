@@ -1,0 +1,250 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-agent-dashboards
+  namespace: ai-observability
+data:
+  agent-overview.json: |
+    {
+      "uid": "agent-overview",
+      "title": "AI Agents — Overview",
+      "tags": ["ai-agents", "internal"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Agent Runs (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "targets": [{ "expr": "sum(increase(agent_runs_total[24h]))", "legendFormat": "Total" }],
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":10},{"color":"red","value":50}] } } }
+        },
+        {
+          "id": 2,
+          "title": "PRs Created (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "targets": [{ "expr": "sum(increase(agent_prs_created_total[24h]))", "legendFormat": "PRs" }]
+        },
+        {
+          "id": 3,
+          "title": "Reviews Posted (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "targets": [{ "expr": "sum(increase(agent_reviews_posted_total[24h]))", "legendFormat": "Reviews" }]
+        },
+        {
+          "id": 4,
+          "title": "LLM Error Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "targets": [{ "expr": "rate(agent_llm_call_errors_total[5m]) / (rate(agent_llm_call_total[5m]) + 0.001) * 100", "legendFormat": "% errors" }],
+          "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":5},{"color":"red","value":20}] } } }
+        },
+        {
+          "id": 5,
+          "title": "Total Tokens (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "targets": [{ "expr": "sum(increase(agent_llm_tokens_total[24h]))", "legendFormat": "Tokens" }]
+        },
+        {
+          "id": 6,
+          "title": "Avg LLM Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "targets": [{ "expr": "histogram_quantile(0.50, rate(agent_llm_call_duration_seconds_bucket[15m]))", "legendFormat": "p50" }],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "id": 10,
+          "title": "LLM Call Latency (p50 / p95 / p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, rate(agent_llm_call_duration_seconds_bucket[5m]))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, rate(agent_llm_call_duration_seconds_bucket[5m]))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, rate(agent_llm_call_duration_seconds_bucket[5m]))", "legendFormat": "p99" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "id": 11,
+          "title": "Agent Runs by Type",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "targets": [
+            { "expr": "increase(agent_runs_total{agent=\"coding-agent\"}[1h])", "legendFormat": "Coding Agent" },
+            { "expr": "increase(agent_runs_total{agent=\"pr-review-agent\"}[1h])", "legendFormat": "PR Review Agent" }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "Token Usage by Agent",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "targets": [
+            { "expr": "increase(agent_llm_tokens_total{agent=\"coding-agent\"}[1h])", "legendFormat": "Coding Agent" },
+            { "expr": "increase(agent_llm_tokens_total{agent=\"pr-review-agent\"}[1h])", "legendFormat": "PR Review Agent" }
+          ]
+        },
+        {
+          "id": 21,
+          "title": "PR Review Outcomes",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 12 },
+          "targets": [
+            { "expr": "sum by (recommendation) (agent_review_recommendation_total)", "legendFormat": "{{ recommendation }}" }
+          ]
+        },
+        {
+          "id": 22,
+          "title": "Active K8s Jobs",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 12 },
+          "targets": [{ "expr": "kube_job_status_active{namespace=\"ai-agents\"}", "legendFormat": "{{ job_name }}" }]
+        },
+        {
+          "id": 30,
+          "title": "Agent Pod CPU",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "targets": [
+            { "expr": "rate(container_cpu_usage_seconds_total{namespace=\"ai-agents\"}[5m])", "legendFormat": "{{ pod }}" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percentunit" } }
+        },
+        {
+          "id": 31,
+          "title": "Agent Pod Memory",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "targets": [
+            { "expr": "container_memory_working_set_bytes{namespace=\"ai-agents\"}", "legendFormat": "{{ pod }}" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "bytes" } }
+        },
+        {
+          "id": 40,
+          "title": "Ollama Model Memory",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "targets": [
+            { "expr": "container_memory_working_set_bytes{namespace=\"ai-models\", pod=~\"ollama.*\"}", "legendFormat": "{{ pod }}" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "bytes" } }
+        },
+        {
+          "id": 41,
+          "title": "LiteLLM Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "targets": [
+            { "expr": "rate(litellm_requests_total[5m])", "legendFormat": "{{ model }}" }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }
+  self-healing.json: |
+    {
+      "uid": "self-healing",
+      "title": "Self-Healing Pipeline",
+      "tags": ["ai-agents", "self-healing", "internal"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": { "from": "now-24h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Telemetry Watcher Runs (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "targets": [{ "expr": "sum(increase(agent_runs_total{agent=\"telemetry-watcher\"}[24h]))", "legendFormat": "Runs" }],
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":50},{"color":"red","value":100}] } } }
+        },
+        {
+          "id": 2,
+          "title": "Firing Alerts",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "targets": [{ "expr": "count(ALERTS{alertstate=\"firing\"})", "legendFormat": "Firing" }],
+          "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"green","value":null},{"color":"orange","value":1},{"color":"red","value":5}] } } }
+        },
+        {
+          "id": 3,
+          "title": "Self-Healing Issues Created (24h)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "targets": [{ "expr": "sum(increase(agent_prs_created_total{agent=\"telemetry-watcher\"}[24h])) or vector(0)", "legendFormat": "Issues" }]
+        },
+        {
+          "id": 4,
+          "title": "Watcher LLM Diagnosis Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "targets": [{ "expr": "histogram_quantile(0.50, rate(agent_llm_call_duration_seconds_bucket{agent=\"telemetry-watcher\"}[1h]))", "legendFormat": "p50" }],
+          "fieldConfig": { "defaults": { "unit": "s" } }
+        },
+        {
+          "id": 10,
+          "title": "Alerts Timeline",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "targets": [
+            { "expr": "count by (alertname) (ALERTS{alertstate=\"firing\"})", "legendFormat": "{{ alertname }}" }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Self-Healing Pipeline Activity",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "targets": [
+            { "expr": "increase(agent_runs_total{agent=\"telemetry-watcher\"}[1h])", "legendFormat": "Watcher Runs" },
+            { "expr": "increase(agent_llm_call_total{agent=\"telemetry-watcher\"}[1h])", "legendFormat": "LLM Diagnoses" },
+            { "expr": "increase(agent_llm_call_errors_total{agent=\"telemetry-watcher\"}[1h])", "legendFormat": "Failed Diagnoses" }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "Application Error Rates",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "targets": [
+            { "expr": "rate(http_requests_total{status=~\"5..\"}[5m])", "legendFormat": "5xx {{ service }}" }
+          ]
+        },
+        {
+          "id": 21,
+          "title": "Pod Restart Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "targets": [
+            { "expr": "increase(kube_pod_container_status_restarts_total{namespace=~\"ai-agents|ai-models\"}[1h])", "legendFormat": "{{ pod }}" }
+          ]
+        },
+        {
+          "id": 30,
+          "title": "Alert Receiver Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "targets": [
+            { "expr": "rate(http_requests_total{pod=~\"alert-receiver.*\"}[5m])", "legendFormat": "requests/s" }
+          ]
+        },
+        {
+          "id": 31,
+          "title": "Alertmanager Notifications",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "targets": [
+            { "expr": "increase(alertmanager_notifications_total[1h])", "legendFormat": "{{ integration }}" },
+            { "expr": "increase(alertmanager_notifications_failed_total[1h])", "legendFormat": "failed {{ integration }}" }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

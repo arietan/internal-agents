@@ -1,0 +1,207 @@
+# Self-Healing Pipeline — CronJob (Telemetry Watcher) + Deployment (Alert Receiver)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: self-healing-config
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+    app.kubernetes.io/component: self-healing
+data:
+  PROMETHEUS_URL: "http://prometheus.ai-observability.svc.cluster.local:9090"
+  LOKI_URL: "http://loki.ai-observability.svc.cluster.local:3100"
+  TEMPO_URL: "http://grafana-tempo.ai-observability.svc.cluster.local:3200"
+  HEALING_CONFIDENCE_THRESHOLD: "0.7"
+  HEALING_COOLDOWN_MINUTES: "30"
+  HEALING_ENABLED: "true"
+---
+# ── Telemetry Watcher CronJob (proactive scan every 15 min) ──
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: telemetry-watcher
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/name: telemetry-watcher
+    app.kubernetes.io/component: self-healing
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: telemetry-watcher
+            app.kubernetes.io/component: self-healing
+        spec:
+          serviceAccountName: self-healing-sa
+          restartPolicy: Never
+          containers:
+            - name: telemetry-watcher
+              image: internal-agents/telemetry-watcher:latest
+              command: ["python", "agents/self-healing/telemetry_watcher.py"]
+              envFrom:
+                - secretRef:
+                    name: agent-secrets
+                - configMapRef:
+                    name: agent-config
+                - configMapRef:
+                    name: self-healing-config
+              volumeMounts:
+                - name: agent-config-vol
+                  mountPath: /etc/agent
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+          volumes:
+            - name: agent-config-vol
+              configMap:
+                name: agent-skills-rules
+---
+# ── Alert Receiver Deployment (real-time Alertmanager webhook) ──
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-receiver
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/name: alert-receiver
+    app.kubernetes.io/component: self-healing
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alert-receiver
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alert-receiver
+        app.kubernetes.io/component: self-healing
+    spec:
+      serviceAccountName: self-healing-sa
+      containers:
+        - name: alert-receiver
+          image: internal-agents/alert-receiver:latest
+          command: ["python", "agents/self-healing/alert_receiver.py"]
+          ports:
+            - containerPort: 8082
+              name: http
+          envFrom:
+            - secretRef:
+                name: agent-secrets
+            - configMapRef:
+                name: agent-config
+            - configMapRef:
+                name: self-healing-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-receiver
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/name: alert-receiver
+    app.kubernetes.io/component: self-healing
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  selector:
+    app.kubernetes.io/name: alert-receiver
+  ports:
+    - port: 8082
+      targetPort: http
+      name: http
+---
+# ── RBAC — ServiceAccount for self-healing components ──
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: self-healing-sa
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+    app.kubernetes.io/component: self-healing
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: self-healing-role
+  namespace: ai-agents
+rules:
+  - apiGroups: ["batch"]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch, create]
+  - apiGroups: [""]
+    resources: [pods, pods/log, configmaps]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: self-healing-binding
+  namespace: ai-agents
+subjects:
+  - kind: ServiceAccount
+    name: self-healing-sa
+    namespace: ai-agents
+roleRef:
+  kind: Role
+  name: self-healing-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Cross-namespace read access to observability services
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: self-healing-obs-reader
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: self-healing-obs-reader
+subjects:
+  - kind: ServiceAccount
+    name: self-healing-sa
+    namespace: ai-agents
+roleRef:
+  kind: ClusterRole
+  name: self-healing-obs-reader
+  apiGroup: rbac.authorization.k8s.io

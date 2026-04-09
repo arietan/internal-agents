@@ -1,0 +1,18 @@
+# Code owners — GitHub will automatically request reviews from these
+# users/teams when PRs touch matching paths.
+#
+# Replace placeholders with your GitHub usernames or team slugs.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+# * @<YOUR_ORG>/maintainers
+
+# Agent code
+# agents/ @<YOUR_ORG>/agent-team
+
+# Infrastructure
+# infra/ @<YOUR_ORG>/platform-team
+# k8s/   @<YOUR_ORG>/platform-team
+
+# Documentation
+# docs/  @<YOUR_ORG>/maintainers

@@ -1,0 +1,56 @@
+apiVersion: kagent.dev/v1alpha1
+kind: Agent
+metadata:
+  name: pr-review-agent
+  namespace: ai-agents
+  labels:
+    kagent.dev/role: reviewer
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  description: |
+    PR review agent that analyses pull request diffs using an LLM,
+    identifies bugs/security/performance/maintainability issues,
+    and recommends the best human approver based on code ownership
+    and team expertise. Posts structured review comments on the PR.
+    Triggered automatically when the coding agent raises a PR, or
+    when any PR with the target label is opened.
+  model:
+    provider: ${AI_PROVIDER}
+    name: ${AI_MODEL}
+    temperature: 0.1
+  tools:
+    - name: github-api
+      description: "Fetch PR metadata, diff, file list; post comments"
+    - name: reviewer-matcher
+      description: "Match changed files to team ownership and expertise"
+    - name: code-reviewer
+      description: "LLM-powered code review with structured output"
+  workflow:
+    steps:
+      - name: fetch-pr
+        tool: github-api
+        action: "Fetch PR metadata, diff, and changed file list"
+      - name: load-standards
+        action: "Load team review standards and reviewer config"
+      - name: recommend-approver
+        tool: reviewer-matcher
+        action: "Score reviewers by ownership, expertise, and workload"
+      - name: llm-review
+        tool: code-reviewer
+        action: "Analyse diff for bugs, security, performance issues"
+      - name: post-review
+        tool: github-api
+        action: "Post structured review comment with approver recommendation"
+      - name: assign-reviewer
+        tool: github-api
+        action: "Auto-assign recommended reviewer (if enabled)"
+        condition: "auto_assign_reviewer == true"
+  guardrails:
+    maxTokensPerRequest: 16384
+    denyPatterns:
+      - "approve without review"
+      - "merge"
+  observability:
+    langfuse:
+      enabled: true
+      tags: ["pr-review", "code-quality", "internal"]

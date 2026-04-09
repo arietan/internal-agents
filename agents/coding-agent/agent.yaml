@@ -1,0 +1,66 @@
+apiVersion: kagent.dev/v1alpha1
+kind: Agent
+metadata:
+  name: coding-agent
+  namespace: ai-agents
+  labels:
+    kagent.dev/role: developer
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  description: |
+    Internal coding agent that analyzes the target codebase,
+    generates implementation changes guided by project rules, skills,
+    and contextual information (issues, roadmap), then raises a PR.
+    Supports scheduled runs and PR-merge triggers.
+    Human review is always required before merge.
+  model:
+    provider: ${AI_PROVIDER}
+    name: ${AI_MODEL}
+    temperature: 0.2
+  tools:
+    - name: github-api
+      description: "Interact with GitHub (issues, PRs, repos)"
+    - name: codebase-analyzer
+      description: "Parse repo structure, conventions, dependencies"
+    - name: code-generator
+      description: "Generate implementation following project rules & skills"
+    - name: test-generator
+      description: "Generate tests covering acceptance criteria"
+    - name: git-operations
+      description: "Branch, commit, push changes"
+    - name: pr-creator
+      description: "Create PR with structured description and labels"
+  workflow:
+    steps:
+      - name: gather-context
+        tool: github-api
+        action: "Fetch issues/roadmap items assigned to the agent"
+      - name: clone-and-analyze
+        tool: codebase-analyzer
+        action: "Clone repo, analyse structure, conventions, and key files"
+      - name: load-rules-skills
+        action: "Load project rules and available skill patterns from config"
+      - name: plan-and-generate
+        tool: code-generator
+        action: "Generate implementation plan and code changes via LLM"
+      - name: apply-changes
+        tool: git-operations
+        action: "Apply file changes to the working tree"
+      - name: create-pr
+        tool: pr-creator
+        action: "Create PR with context, reasoning, and ai-generated label"
+      - name: audit-log
+        action: "Write structured audit log for compliance"
+  guardrails:
+    maxTokensPerRequest: 16384
+    denyPatterns:
+      - "force push"
+      - "skip ci"
+      - "--no-verify"
+      - "rm -rf"
+    requireApproval:
+      - merge
+  observability:
+    langfuse:
+      enabled: true
+      tags: ["coding-agent", "code-generation", "internal"]

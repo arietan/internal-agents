@@ -1,0 +1,178 @@
+# MAS AIRG — AI System Registry
+#
+# This manifest documents all AI systems in the internal-agents platform.
+# Required by MAS AIRG Section 3: AI Identification and Inventory.
+# Update this file for any new agent, model change, or scope modification.
+# Changes require approval from the AI Oversight Committee.
+#
+# Last reviewed: 2026-04-07
+# Next review due: 2026-07-07
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-system-registry
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+    compliance.mas.gov.sg/type: ai-registry
+  annotations:
+    compliance.mas.gov.sg/reviewed-by: ""      # fill: AI Oversight Committee chair
+    compliance.mas.gov.sg/review-date: "2026-04-07"
+    compliance.mas.gov.sg/next-review: "2026-07-07"
+data:
+  registry.yaml: |
+    schema_version: "1.0"
+    organisation: ""  # fill: your organisation name
+    accountable_executive: ""  # fill: Head of Engineering / CTO name
+    oversight_committee:
+      chair: ""
+      members: []
+      meeting_cadence: "monthly"
+
+    ai_systems:
+
+      - id: "AGSYS-001"
+        name: "Internal Coding Agent"
+        description: >
+          Autonomous coding agent that analyses a target repository,
+          generates code changes guided by project rules and skills,
+          and raises a pull request for human review.
+        status: "production"
+        deployment_date: "2026-04-07"
+        owner: ""  # fill: team/individual
+        accountable_executive: ""
+
+        risk_materiality:
+          overall: "medium"
+          impact: "medium"
+          complexity: "medium"
+          reliance: "medium"
+          assessment_date: "2026-04-07"
+          next_assessment: "2026-07-07"
+          rationale: >
+            Modifies internal codebase only. No direct customer/financial impact.
+            All changes require human PR approval before merge.
+
+        model_dependencies:
+          - provider: "ollama"
+            model: "qwen2.5-coder:1.5b"
+            type: "self-hosted"
+            data_residency: "on-premises"
+            version_pinned: true
+            last_validated: "2026-04-07"
+
+        data_flows:
+          inputs:
+            - "Source code from GitHub repositories (internal)"
+            - "GitHub issue descriptions"
+            - "Project rules and skills YAML configs"
+          outputs:
+            - "Code changes (pull requests)"
+            - "Audit trail records"
+          data_classification: "internal"
+          pii_processed: false
+          dlp_enabled: true
+
+        human_oversight:
+          approval_required: true
+          approval_mechanism: "GitHub branch protection — PR must be approved by human reviewer"
+          kill_switch: "COMPLIANCE_KILL_SWITCH env var + /etc/agent/kill-switch file"
+          escalation_path: "Agent Ops Team → Accountable Executive → AI Oversight Committee"
+
+        controls:
+          audit_trail: "immutable hash-chained JSON records on persistent volume"
+          monitoring: "Grafana dashboards, Prometheus alerts, Langfuse LLM traces"
+          testing: "Canary prompt validation on model updates"
+          change_management: "Model changes require AI Oversight Committee approval"
+
+        trigger_mechanisms:
+          - type: "scheduled"
+            description: "CronJob — weekdays at 3 AM"
+          - type: "event"
+            description: "GitHub webhook on PR merge or push"
+
+      - id: "AGSYS-002"
+        name: "PR Review Agent"
+        description: >
+          Automated code reviewer that analyses pull request diffs,
+          identifies issues, assesses risk, and recommends a human
+          approver. Posts structured review comments on the PR.
+        status: "production"
+        deployment_date: "2026-04-07"
+        owner: ""
+        accountable_executive: ""
+
+        risk_materiality:
+          overall: "low-medium"
+          impact: "low"
+          complexity: "medium"
+          reliance: "low"
+          assessment_date: "2026-04-07"
+          next_assessment: "2026-07-07"
+          rationale: >
+            Advisory only — review comments do not block merges.
+            Human reviewer makes the final approval decision.
+
+        model_dependencies:
+          - provider: "ollama"
+            model: "qwen2.5-coder:1.5b"
+            type: "self-hosted"
+            data_residency: "on-premises"
+            version_pinned: true
+            last_validated: "2026-04-07"
+
+        data_flows:
+          inputs:
+            - "PR metadata and diffs from GitHub"
+            - "Review standards YAML"
+            - "Team reviewer configuration"
+          outputs:
+            - "Review comments posted to GitHub PRs"
+            - "Reviewer assignment requests"
+            - "Audit trail records"
+          data_classification: "internal"
+          pii_processed: false
+          dlp_enabled: true
+
+        human_oversight:
+          approval_required: false
+          approval_mechanism: "Advisory only — human reviewer makes final decision"
+          kill_switch: "COMPLIANCE_KILL_SWITCH env var + /etc/agent/kill-switch file"
+          escalation_path: "Agent Ops Team → Accountable Executive → AI Oversight Committee"
+
+        controls:
+          audit_trail: "immutable hash-chained JSON records on persistent volume"
+          monitoring: "Grafana dashboards, Prometheus alerts, Langfuse LLM traces"
+          testing: "Canary prompt validation on model updates"
+          change_management: "Model changes require AI Oversight Committee approval"
+
+        trigger_mechanisms:
+          - type: "event"
+            description: "GitHub webhook on PR opened or synchronized"
+
+    # Approved AI providers and models
+    approved_providers:
+      - name: "ollama"
+        type: "self-hosted"
+        data_residency: "on-premises"
+        risk_assessment: "low"
+        approved_date: "2026-04-07"
+      - name: "litellm"
+        type: "gateway"
+        data_residency: "on-premises"
+        risk_assessment: "low"
+        approved_date: "2026-04-07"
+      - name: "vllm"
+        type: "self-hosted"
+        data_residency: "on-premises"
+        risk_assessment: "low"
+        approved_date: "2026-04-07"
+
+    # Unapproved providers — blocked by default
+    # To approve: submit vendor risk assessment to AI Oversight Committee
+    blocked_providers:
+      - name: "anthropic"
+        reason: "External API — requires vendor risk assessment and data residency review"
+      - name: "openai"
+        reason: "External API — requires vendor risk assessment and data residency review"

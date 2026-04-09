@@ -1,0 +1,10 @@
+# Azure-native deployment dependencies
+-r requirements.txt
+azure-identity>=1.19.0
+azure-cosmos>=4.9.0
+azure-appconfiguration>=1.7.0
+azure-keyvault-secrets>=4.9.0
+azure-storage-blob>=12.24.0
+azure-ai-contentsafety>=1.0.0
+azure-monitor-opentelemetry-exporter>=1.0.0b29
+azure-functions>=1.21.0

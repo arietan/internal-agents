@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Local cluster overlay — uses locally built images and relaxed resource limits
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - coding-agent-patch.yaml
+  - pr-review-agent-patch.yaml
+
+# For local dev: generate secrets from a .env file
+# secretGenerator:
+#   - name: agent-secrets
+#     envs:
+#       - .env

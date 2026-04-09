@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install core dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate YAML manifests
+        run: |
+          find k8s/ agents/ -name '*.yaml' | while read f; do
+            python -c "import yaml; yaml.safe_load(open('$f'))" || { echo "FAIL: $f"; exit 1; }
+          done
+
+      - name: Compile Python modules
+        run: |
+          python -m py_compile agents/coding-agent/coding_agent.py
+          python -m py_compile agents/coding-agent/webhook_listener.py
+          python -m py_compile agents/pr-review-agent/pr_review_agent.py
+          python -m py_compile agents/pr-review-agent/webhook_listener.py
+          python -m py_compile agents/self-healing/telemetry_watcher.py
+          python -m py_compile agents/self-healing/alert_receiver.py
+
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - infra/terraform/aws-native
+          - infra/terraform/azure-native
+          - infra/terraform/gcp-native
+          - infra/terraform/cloud-agnostic
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+
+      - name: Terraform Init
+        working-directory: ${{ matrix.module }}
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        working-directory: ${{ matrix.module }}
+        run: terraform validate
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - coding-agent
+          - coding-agent-webhook
+          - pr-review-agent
+          - pr-review-webhook
+          - telemetry-watcher
+          - alert-receiver
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.target }}
+        run: docker build --target ${{ matrix.target }} -t test/${{ matrix.target }}:ci .

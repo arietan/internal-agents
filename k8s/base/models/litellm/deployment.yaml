@@ -1,0 +1,123 @@
+# LiteLLM Proxy — unified OpenAI-compatible gateway.
+# Sits in front of Ollama and/or vLLM so agent code always calls one endpoint.
+# Handles model routing, load balancing, fallbacks, rate limits, and spend tracking.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: ai-models
+data:
+  config.yaml: |
+    model_list:
+      - model_name: "coding-model"
+        litellm_params:
+          model: "ollama/qwen2.5-coder:1.5b"
+          api_base: "http://host.docker.internal:11434"
+          stream: true
+        model_info:
+          description: "Qwen 2.5 Coder 1.5B via host Ollama"
+
+      - model_name: "review-model"
+        litellm_params:
+          model: "ollama/qwen2.5-coder:1.5b"
+          api_base: "http://host.docker.internal:11434"
+          stream: true
+        model_info:
+          description: "Model used for PR reviews via host Ollama"
+
+      # Alternative: vLLM backend (uncomment if running vLLM)
+      # - model_name: "coding-model"
+      #   litellm_params:
+      #     model: "openai/qwen2.5-coder:32b"
+      #     api_base: "http://vllm.ai-models.svc.cluster.local:8000/v1"
+      #     api_key: "not-needed"
+      #   model_info:
+      #     description: "Qwen 2.5 Coder 32B via vLLM"
+
+    litellm_settings:
+      drop_params: true
+      set_verbose: false
+      request_timeout: 300
+      num_retries: 2
+
+    general_settings:
+      master_key: "sk-internal-agents-local"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: ai-models
+  labels:
+    app.kubernetes.io/name: litellm
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litellm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: litellm
+        app.kubernetes.io/component: gateway
+    spec:
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-stable
+          args:
+            - "--config"
+            - "/etc/litellm/config.yaml"
+            - "--port"
+            - "4000"
+          ports:
+            - containerPort: 4000
+              name: http
+          env:
+            - name: STORE_MODEL_IN_DB
+              value: "false"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/litellm
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: ai-models
+  labels:
+    app.kubernetes.io/name: litellm
+    app.kubernetes.io/part-of: internal-agents
+spec:
+  selector:
+    app.kubernetes.io/name: litellm
+  ports:
+    - port: 4000
+      targetPort: http
+      protocol: TCP
+      name: http

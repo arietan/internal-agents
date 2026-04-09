@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+data:
+  # LLM provider: "ollama" (self-hosted) | "litellm" (gateway) | "anthropic" | "openai"
+  AI_PROVIDER: "litellm"
+  AI_MODEL: "coding-model"
+  AI_REVIEW_MODEL: "review-model"
+  MAX_TOKENS: "8192"
+
+  # LiteLLM gateway — unified endpoint routing to Ollama/vLLM backends.
+  # Agents call this single URL; LiteLLM handles model selection and fallback.
+  AI_BASE_URL: "http://litellm.ai-models.svc.cluster.local:4000/v1"
+  LITELLM_API_KEY: "sk-internal-agents-local"
+
+  # Direct Ollama endpoint (used when AI_PROVIDER=ollama, bypassing LiteLLM)
+  OLLAMA_BASE_URL: "http://ollama.ai-models.svc.cluster.local:11434/v1"
+
+  # Target repository
+  TARGET_REPO: "<YOUR_ORG>/<YOUR_REPO>"
+  TARGET_BRANCH: "main"
+
+  # Coding agent context source: "issues" | "roadmap_file" | "manual"
+  CONTEXT_SOURCE: "issues"
+  CONTEXT_ISSUE_LABEL: "ai-agent"
+
+  # PR review settings
+  AUTO_ASSIGN_REVIEWER: "true"
+  REVIEW_ALL_PRS: "false"
+
+  # Paths inside the container (mounted from agent-skills-rules ConfigMap)
+  SKILLS_PATH: "/etc/agent/skills.yaml"
+  RULES_PATH: "/etc/agent/rules.yaml"
+  REVIEWERS_PATH: "/etc/agent/reviewers.yaml"
+
+  # Langfuse (LLM observability)
+  LANGFUSE_HOST: "http://langfuse.ai-observability.svc.cluster.local:3000"
+  LANGFUSE_PUBLIC_KEY: "pk-lf-internal-agents"
+  LANGFUSE_SECRET_KEY: "sk-lf-internal-agents"
+
+  # OpenTelemetry
+  OTEL_ENABLED: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.ai-observability.svc.cluster.local:4317"
+  METRICS_PORT: "9464"
+
+  # Self-healing pipeline
+  PROMETHEUS_URL: "http://prometheus.ai-observability.svc.cluster.local:9090"
+  LOKI_URL: "http://loki.ai-observability.svc.cluster.local:3100"
+  TEMPO_URL: "http://grafana-tempo.ai-observability.svc.cluster.local:3200"
+  HEALING_CONFIDENCE_THRESHOLD: "0.7"
+  HEALING_COOLDOWN_MINUTES: "30"
+  HEALING_ENABLED: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-skills-rules
+  namespace: ai-agents
+  labels:
+    app.kubernetes.io/part-of: internal-agents
+data:
+  skills.yaml: |
+    # Agent skills — patterns and capabilities the coding agent can leverage.
+    # Extend this file to teach the agent new patterns.
+    skills:
+      - name: api-endpoint
+        description: "Create a new REST API endpoint following project conventions"
+        pattern: |
+          - Add route handler in the appropriate router file
+          - Include input validation (Pydantic / Zod / JSON Schema)
+          - Add OpenAPI docstring or decorator
+          - Write integration test
+          - Update API docs if present
+
+      - name: database-migration
+        description: "Create a database schema migration"
+        pattern: |
+          - Generate migration file using the project's ORM tool
+          - Include both up and down migrations
+          - Add seed data if required
+          - Test rollback
+
+      - name: bug-fix
+        description: "Fix a reported bug"
+        pattern: |
+          - Reproduce with a failing test first
+          - Apply minimal fix
+          - Verify the test passes
+          - Check for similar patterns elsewhere
+
+      - name: refactor
+        description: "Improve code structure without changing behavior"
+        pattern: |
+          - Ensure existing tests pass before changes
+          - Apply transformation incrementally
+          - Run full test suite after each step
+          - No new features in the same change
+
+      - name: self-healing-fix
+        description: "Fix an issue identified by telemetry (logs, metrics, alerts)"
+        pattern: |
+          - Read the telemetry diagnosis carefully (error logs, metrics, traces)
+          - Identify the root cause in the codebase
+          - Apply minimal, targeted fix
+          - Add or update error handling if the issue is a crash or exception
+          - Add or improve logging around the fixed area
+          - Include a regression test if feasible
+
+  rules.yaml: |
+    # Project coding rules — the agent must follow these.
+    rules:
+      general:
+        - Write clear, self-documenting code; avoid unnecessary comments
+        - Keep functions small and focused (< 50 lines)
+        - Handle errors explicitly; never silently swallow exceptions
+        - No hardcoded secrets or credentials
+        - All public functions must have type hints (Python) or JSDoc (JS/TS)
+
+      git:
+        - Use conventional commits (feat:, fix:, chore:, docs:, refactor:, test:)
+        - One logical change per commit
+        - Branch names: feature/, fix/, chore/ prefix + kebab-case
+
+      testing:
+        - Every bug fix must include a regression test
+        - Minimum 80% coverage for new code
+        - Tests must be deterministic (no flaky tests)
+
+      security:
+        - Never commit secrets, tokens, or API keys
+        - Validate all user input
+        - Use parameterized queries for database access
+        - Pin dependency versions
+
+      review_standards:
+        - Focus on bugs, security, performance, maintainability
+        - Every issue must include a concrete fix suggestion
+        - Do not nitpick formatting (linters handle that)
+        - Reserve critical and high severity for real bugs or security issues only
+
+  reviewers.yaml: |
+    # Team reviewer configuration.
+    # The PR review agent uses this to recommend the best approver.
+    reviewers:
+      - github: "senior-dev-1"
+        name: "Senior Developer 1"
+        expertise: [".py", ".yaml", ".tf"]
+        owns:
+          - "src/backend/**"
+          - "infra/**"
+        lead: true
+        current_prs: 2
+
+      - github: "senior-dev-2"
+        name: "Senior Developer 2"
+        expertise: [".ts", ".tsx", ".js", ".css"]
+        owns:
+          - "src/frontend/**"
+          - "src/components/**"
+        lead: false
+        current_prs: 1
+
+      - github: "devops-lead"
+        name: "DevOps Lead"
+        expertise: [".yaml", ".tf", ".sh", "Dockerfile"]
+        owns:
+          - "k8s/**"
+          - ".github/**"
+          - "deploy/**"
+          - "Dockerfile"
+        lead: true
+        current_prs: 0
+
+      - github: "qa-engineer"
+        name: "QA Engineer"
+        expertise: [".py", ".ts", ".spec.ts"]
+        owns:
+          - "tests/**"
+          - "e2e/**"
+        lead: false
+        current_prs: 1
