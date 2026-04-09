@@ -8,9 +8,18 @@ provider "azurerm" { features {} }
 
 variable "environment" { type = string }
 variable "name_prefix" { type = string }
-variable "location" { type = string; default = "eastus2" }
-variable "node_vm_size" { type = string; default = "Standard_D4s_v3" }
-variable "node_count" { type = number; default = 3 }
+variable "location" {
+  type    = string
+  default = "eastus2"
+}
+variable "node_vm_size" {
+  type    = string
+  default = "Standard_D4s_v3"
+}
+variable "node_count" {
+  type    = number
+  default = 3
+}
 
 resource "azurerm_resource_group" "main" {
   name     = "${var.name_prefix}-${var.environment}-rg"

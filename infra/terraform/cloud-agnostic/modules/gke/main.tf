@@ -6,10 +6,22 @@ terraform {
 
 variable "environment" { type = string }
 variable "name_prefix" { type = string }
-variable "project_id" { type = string; default = "" }
-variable "region" { type = string; default = "us-central1" }
-variable "machine_type" { type = string; default = "e2-standard-4" }
-variable "node_count" { type = number; default = 3 }
+variable "project_id" {
+  type    = string
+  default = ""
+}
+variable "region" {
+  type    = string
+  default = "us-central1"
+}
+variable "machine_type" {
+  type    = string
+  default = "e2-standard-4"
+}
+variable "node_count" {
+  type    = number
+  default = 3
+}
 
 resource "google_container_cluster" "main" {
   name     = "${var.name_prefix}-${var.environment}-gke"

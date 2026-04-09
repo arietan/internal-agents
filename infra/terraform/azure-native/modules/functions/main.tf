@@ -56,7 +56,10 @@ variable "name_prefix" { type = string }
 variable "location" { type = string }
 variable "resource_group_name" { type = string }
 variable "storage_account_id" { type = string }
-variable "cosmos_connection" { type = string; sensitive = true }
+variable "cosmos_connection" {
+  type      = string
+  sensitive = true
+}
 variable "keyvault_uri" { type = string }
 variable "appinsights_key" { type = string }
 variable "appinsights_conn" { type = string }

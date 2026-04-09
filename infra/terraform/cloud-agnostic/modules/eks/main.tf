@@ -10,10 +10,22 @@ provider "aws" {
 
 variable "environment" { type = string }
 variable "name_prefix" { type = string }
-variable "region" { type = string; default = "us-east-1" }
-variable "cluster_version" { type = string; default = "1.30" }
-variable "node_instance_type" { type = string; default = "m6i.xlarge" }
-variable "node_count" { type = number; default = 3 }
+variable "region" {
+  type    = string
+  default = "us-east-1"
+}
+variable "cluster_version" {
+  type    = string
+  default = "1.30"
+}
+variable "node_instance_type" {
+  type    = string
+  default = "m6i.xlarge"
+}
+variable "node_count" {
+  type    = number
+  default = 3
+}
 
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
