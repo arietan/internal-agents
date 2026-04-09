@@ -26,7 +26,7 @@ jobs:
       - name: Validate YAML manifests
         run: |
           find k8s/ agents/ -name '*.yaml' | while read f; do
-            python -c "import yaml; yaml.safe_load(open('$f'))" || { echo "FAIL: $f"; exit 1; }
+            python -c "import yaml; list(yaml.safe_load_all(open('$f')))" || { echo "FAIL: $f"; exit 1; }
           done
 
       - name: Compile Python modules
