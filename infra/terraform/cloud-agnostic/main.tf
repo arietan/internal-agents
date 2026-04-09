@@ -1,5 +1,36 @@
 terraform {
   required_version = ">= 1.5"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.80"
+    }
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region                      = "us-east-1"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+}
+
+provider "azurerm" {
+  features {}
+  skip_provider_registration = true
+}
+
+provider "google" {
+  project = "placeholder"
+  region  = "us-central1"
 }
 
 variable "cloud" {

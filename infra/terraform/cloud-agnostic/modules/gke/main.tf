@@ -1,9 +1,3 @@
-terraform {
-  required_providers {
-    google = { source = "hashicorp/google", version = "~> 5.0" }
-  }
-}
-
 variable "environment" { type = string }
 variable "name_prefix" { type = string }
 variable "project_id" {

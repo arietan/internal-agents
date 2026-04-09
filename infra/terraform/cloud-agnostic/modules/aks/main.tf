@@ -1,11 +1,3 @@
-terraform {
-  required_providers {
-    azurerm = { source = "hashicorp/azurerm", version = "~> 3.80" }
-  }
-}
-
-provider "azurerm" { features {} }
-
 variable "environment" { type = string }
 variable "name_prefix" { type = string }
 variable "location" {
